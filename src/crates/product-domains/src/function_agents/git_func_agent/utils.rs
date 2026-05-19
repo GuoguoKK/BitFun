@@ -294,3 +294,9 @@ pub fn parse_commit_analysis_value(value: &serde_json::Value) -> Result<AICommit
         confidence: value["confidence"].as_f64().unwrap_or(0.8) as f32,
     })
 }
+
+pub fn parse_commit_analysis_json(json: &str) -> Result<AICommitAnalysis, String> {
+    let value = serde_json::from_str::<serde_json::Value>(json)
+        .map_err(|error| format!("Failed to parse AI response: {}", error))?;
+    parse_commit_analysis_value(&value)
+}

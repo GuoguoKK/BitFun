@@ -2,6 +2,7 @@ use super::types::*;
 use crate::function_agents::common::{AgentError, AgentResult, Language};
 use crate::infrastructure::ai::AIClient;
 use crate::util::types::Message;
+use bitfun_product_domains::function_agents::startchat_func_agent::parse_complete_analysis_json;
 /**
  * AI analysis service
  *
@@ -107,15 +108,10 @@ impl AIWorkStateService {
 
         debug!("Parsing JSON response: length={}", json_str.len());
 
-        let parsed: serde_json::Value = serde_json::from_str(&json_str).map_err(|e| {
-            error!(
-                "Failed to parse complete analysis response: {}, response: {}",
-                e, response
-            );
-            AgentError::internal_error(format!("Failed to parse complete analysis response: {}", e))
+        let parsed_analysis = parse_complete_analysis_json(&json_str).map_err(|message| {
+            error!("{}, response: {}", message, response);
+            AgentError::internal_error(message)
         })?;
-
-        let parsed_analysis = super::utils::parse_complete_analysis_value(&parsed);
 
         if parsed_analysis.predicted_actions_count < 3 {
             warn!(
@@ -149,5 +145,85 @@ impl AIWorkStateService {
         );
 
         Ok(parsed_analysis.analysis)
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use crate::function_agents::common::AgentErrorType;
+    use crate::util::types::AIConfig;
+    use bitfun_ai_adapters::types::ReasoningMode;
+
+    fn test_service() -> AIWorkStateService {
+        AIWorkStateService {
+            ai_client: Arc::new(AIClient::new(AIConfig {
+                name: "test".to_string(),
+                base_url: "http://127.0.0.1".to_string(),
+                request_url: "http://127.0.0.1".to_string(),
+                api_key: "test".to_string(),
+                model: "test-model".to_string(),
+                format: "openai".to_string(),
+                context_window: 8192,
+                max_tokens: None,
+                temperature: None,
+                top_p: None,
+                reasoning_mode: ReasoningMode::Default,
+                inline_think_in_text: false,
+                custom_headers: None,
+                custom_headers_mode: None,
+                skip_ssl_verify: false,
+                reasoning_effort: None,
+                thinking_budget_tokens: None,
+                custom_request_body: None,
+                custom_request_body_mode: None,
+            })),
+        }
+    }
+
+    #[test]
+    fn parse_complete_analysis_preserves_core_json_extraction_and_error_mapping() {
+        let service = test_service();
+        let analysis = service
+            .parse_complete_analysis(
+                r#"The answer is:
+```json
+{
+  "summary": "Working on product-domain owner closure.",
+  "predicted_actions": [
+    {"description": "Run checks", "priority": "High", "icon": "check", "is_reminder": false}
+  ],
+  "quick_actions": [
+    {"title": "Status", "command": "git status", "icon": "git", "action_type": "ViewStatus"}
+  ]
+}
+```
+"#,
+            )
+            .unwrap();
+
+        assert_eq!(analysis.summary, "Working on product-domain owner closure.");
+        assert_eq!(analysis.predicted_actions.len(), 3);
+        assert_eq!(analysis.quick_actions.len(), 1);
+
+        let missing_json = service.parse_complete_analysis("no json here").unwrap_err();
+        assert_eq!(missing_json.error_type, AgentErrorType::InternalError);
+        assert_eq!(
+            missing_json.message,
+            "Failed to extract JSON from analysis response"
+        );
+
+        let invalid_json = service
+            .parse_complete_analysis(
+                r#"```json
+not json
+```"#,
+            )
+            .unwrap_err();
+        assert_eq!(invalid_json.error_type, AgentErrorType::InternalError);
+        assert_eq!(
+            invalid_json.message,
+            "Failed to extract JSON from analysis response"
+        );
     }
 }

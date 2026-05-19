@@ -9,9 +9,10 @@ use crate::miniapp::manager::MiniAppManager;
 use crate::miniapp::types::MiniAppMeta;
 use crate::util::errors::{BitFunError, BitFunResult};
 use bitfun_product_domains::miniapp::builtin::{
-    build_builtin_package_json, builtin_content_hash, builtin_source_files,
-    should_seed_builtin_app, BuiltinInstallMarker, BuiltinMiniAppBundle, BUILTIN_INSTALL_MARKER,
-    BUILTIN_PLACEHOLDER_COMPILED_HTML, LEGACY_BUILTIN_VERSION_MARKER,
+    build_builtin_package_json, builtin_source_files, parse_builtin_install_marker,
+    resolve_builtin_seed_action, resolve_builtin_seed_check, serialize_builtin_install_marker,
+    BuiltinInstallMarker, BuiltinMiniAppBundle, BuiltinSeedAction, BuiltinSeedCheck,
+    BUILTIN_INSTALL_MARKER, BUILTIN_PLACEHOLDER_COMPILED_HTML, LEGACY_BUILTIN_VERSION_MARKER,
 };
 use chrono::Utc;
 use std::path::Path;
@@ -90,28 +91,35 @@ pub async fn seed_builtin_miniapps(manager: &Arc<MiniAppManager>) -> BitFunResul
 async fn seed_one(manager: &Arc<MiniAppManager>, app: &BuiltinApp) -> BitFunResult<()> {
     let app_dir = manager.path_manager().miniapp_dir(app.id);
     let marker_path = app_dir.join(BUILTIN_INSTALL_MARKER);
-    let content_hash = builtin_content_hash(app);
-
-    if let Some(marker) = read_builtin_install_marker(&marker_path).await? {
-        if !should_seed_builtin_app(app, &content_hash, Some(&marker)) {
-            return Ok(());
-        }
-    }
+    let installed_marker = read_builtin_install_marker(&marker_path).await?;
+    let seed_artifacts = match resolve_builtin_seed_check(app, installed_marker.as_ref()) {
+        BuiltinSeedCheck::Skip => return Ok(()),
+        BuiltinSeedCheck::NeedsSeed(artifacts) => artifacts,
+    };
 
     let now = Utc::now().timestamp_millis();
-    match manager.load_customization_metadata(app.id).await {
-        Ok(Some(metadata)) if metadata.local_override => {
+    let has_local_override = match manager.load_customization_metadata(app.id).await {
+        Ok(Some(metadata)) => metadata.local_override,
+        Ok(None) => false,
+        Err(e) => {
+            log::warn!(
+                "read customization metadata for builtin miniapp '{}' failed: {}",
+                app.id,
+                e
+            );
+            false
+        }
+    };
+
+    match resolve_builtin_seed_action(seed_artifacts, has_local_override) {
+        BuiltinSeedAction::PreserveLocalOverride(artifacts) => {
             let recorded = manager
-                .mark_builtin_update_available(app.id, app.version, &content_hash, now)
+                .mark_builtin_update_available(app.id, app.version, &artifacts.content_hash, now)
                 .await?;
-            let marker = BuiltinInstallMarker {
-                version: app.version,
-                hash: content_hash,
-            };
-            write_builtin_install_marker(&marker_path, &marker).await?;
+            write_builtin_install_marker(&marker_path, &artifacts.marker).await?;
             write_file(
                 app_dir.join(LEGACY_BUILTIN_VERSION_MARKER),
-                &app.version.to_string(),
+                &artifacts.legacy_version,
             )
             .await?;
             if recorded {
@@ -129,16 +137,19 @@ async fn seed_one(manager: &Arc<MiniAppManager>, app: &BuiltinApp) -> BitFunResu
             }
             return Ok(());
         }
-        Ok(_) => {}
-        Err(e) => {
-            log::warn!(
-                "read customization metadata for builtin miniapp '{}' failed: {}",
-                app.id,
-                e
-            );
+        BuiltinSeedAction::SeedBundle(artifacts) => {
+            seed_builtin_bundle(manager, app, artifacts, now).await
         }
     }
+}
 
+async fn seed_builtin_bundle(
+    manager: &Arc<MiniAppManager>,
+    app: &BuiltinApp,
+    artifacts: bitfun_product_domains::miniapp::builtin::BuiltinSeedArtifacts,
+    now: i64,
+) -> BitFunResult<()> {
+    let app_dir = manager.path_manager().miniapp_dir(app.id);
     let source_dir = app_dir.join("source");
     tokio::fs::create_dir_all(&source_dir)
         .await
@@ -191,21 +202,18 @@ async fn seed_one(manager: &Arc<MiniAppManager>, app: &BuiltinApp) -> BitFunResu
     // Recompile to assemble the final compiled.html with bridge + theme + import map.
     manager.recompile(app.id, "dark", None).await?;
 
-    let marker = BuiltinInstallMarker {
-        version: app.version,
-        hash: content_hash,
-    };
-    write_builtin_install_marker(&marker_path, &marker).await?;
+    let marker_path = app_dir.join(BUILTIN_INSTALL_MARKER);
+    write_builtin_install_marker(&marker_path, &artifacts.marker).await?;
     write_file(
         app_dir.join(LEGACY_BUILTIN_VERSION_MARKER),
-        &app.version.to_string(),
+        &artifacts.legacy_version,
     )
     .await?;
     log::info!(
         "seeded builtin miniapp '{}' (v{}, {})",
         app.id,
         app.version,
-        marker.hash
+        artifacts.marker.hash
     );
     Ok(())
 }
@@ -223,7 +231,7 @@ async fn read_builtin_install_marker(path: &Path) -> BitFunResult<Option<Builtin
         }
     };
 
-    match serde_json::from_str::<BuiltinInstallMarker>(&content) {
+    match parse_builtin_install_marker(&content) {
         Ok(marker) => Ok(Some(marker)),
         Err(error) => {
             log::warn!(
@@ -240,7 +248,7 @@ async fn write_builtin_install_marker(
     path: &Path,
     marker: &BuiltinInstallMarker,
 ) -> BitFunResult<()> {
-    let content = serde_json::to_string_pretty(marker).map_err(BitFunError::from)?;
+    let content = serialize_builtin_install_marker(marker).map_err(BitFunError::from)?;
     write_file(path, &content).await
 }
 
@@ -253,6 +261,7 @@ async fn write_file<P: AsRef<std::path::Path>>(path: P, content: &str) -> BitFun
 #[cfg(test)]
 mod tests {
     use super::*;
+    use bitfun_product_domains::miniapp::builtin::{builtin_content_hash, should_seed_builtin_app};
     use bitfun_product_domains::miniapp::customization::{
         MiniAppCustomizationMetadata, MiniAppCustomizationOrigin, MiniAppCustomizationOriginKind,
     };

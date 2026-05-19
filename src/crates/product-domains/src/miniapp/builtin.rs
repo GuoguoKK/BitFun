@@ -17,6 +17,25 @@ pub struct BuiltinInstallMarker {
     pub hash: String,
 }
 
+#[derive(Clone, Debug, PartialEq, Eq)]
+pub struct BuiltinSeedArtifacts {
+    pub content_hash: String,
+    pub marker: BuiltinInstallMarker,
+    pub legacy_version: String,
+}
+
+#[derive(Clone, Debug, PartialEq, Eq)]
+pub enum BuiltinSeedCheck {
+    Skip,
+    NeedsSeed(BuiltinSeedArtifacts),
+}
+
+#[derive(Clone, Debug, PartialEq, Eq)]
+pub enum BuiltinSeedAction {
+    PreserveLocalOverride(BuiltinSeedArtifacts),
+    SeedBundle(BuiltinSeedArtifacts),
+}
+
 /// Pure built-in MiniApp asset bundle shape. The owning runtime still decides
 /// how assets are embedded, seeded, compiled, and persisted.
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
@@ -44,6 +63,62 @@ pub fn builtin_content_hash(app: &BuiltinMiniAppBundle) -> String {
         app.esm_dependencies_json,
     );
     format!("sha256:{}", hex_encode(&hasher.finalize()))
+}
+
+pub fn build_builtin_install_marker(
+    app: &BuiltinMiniAppBundle,
+    content_hash: &str,
+) -> BuiltinInstallMarker {
+    BuiltinInstallMarker {
+        version: app.version,
+        hash: content_hash.to_string(),
+    }
+}
+
+pub fn legacy_builtin_version_marker_content(app: &BuiltinMiniAppBundle) -> String {
+    app.version.to_string()
+}
+
+pub fn build_builtin_seed_artifacts(app: &BuiltinMiniAppBundle) -> BuiltinSeedArtifacts {
+    let content_hash = builtin_content_hash(app);
+    BuiltinSeedArtifacts {
+        marker: build_builtin_install_marker(app, &content_hash),
+        legacy_version: legacy_builtin_version_marker_content(app),
+        content_hash,
+    }
+}
+
+pub fn resolve_builtin_seed_check(
+    app: &BuiltinMiniAppBundle,
+    installed: Option<&BuiltinInstallMarker>,
+) -> BuiltinSeedCheck {
+    let artifacts = build_builtin_seed_artifacts(app);
+    if should_seed_builtin_app(app, &artifacts.content_hash, installed) {
+        BuiltinSeedCheck::NeedsSeed(artifacts)
+    } else {
+        BuiltinSeedCheck::Skip
+    }
+}
+
+pub fn resolve_builtin_seed_action(
+    artifacts: BuiltinSeedArtifacts,
+    has_local_override: bool,
+) -> BuiltinSeedAction {
+    if has_local_override {
+        BuiltinSeedAction::PreserveLocalOverride(artifacts)
+    } else {
+        BuiltinSeedAction::SeedBundle(artifacts)
+    }
+}
+
+pub fn serialize_builtin_install_marker(
+    marker: &BuiltinInstallMarker,
+) -> serde_json::Result<String> {
+    serde_json::to_string_pretty(marker)
+}
+
+pub fn parse_builtin_install_marker(content: &str) -> serde_json::Result<BuiltinInstallMarker> {
+    serde_json::from_str(content)
 }
 
 pub fn should_seed_builtin_app(

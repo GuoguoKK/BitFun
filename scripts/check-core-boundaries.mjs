@@ -1920,6 +1920,14 @@ const requiredContentRules = [
         message: 'missing product-domain built-in MiniApp seed decision use',
       },
       {
+        regex: /\bresolve_builtin_seed_check\b/,
+        message: 'missing product-domain built-in MiniApp seed check use',
+      },
+      {
+        regex: /\bresolve_builtin_seed_action\b/,
+        message: 'missing product-domain built-in MiniApp seed action use',
+      },
+      {
         regex: /\bbuiltin_source_files\b/,
         message: 'missing product-domain built-in MiniApp source payload use',
       },
@@ -1932,8 +1940,16 @@ const requiredContentRules = [
         message: 'missing core-owned built-in MiniApp marker read IO',
       },
       {
+        regex: /\bparse_builtin_install_marker\b/,
+        message: 'missing product-domain built-in MiniApp marker parse helper use',
+      },
+      {
         regex: /\bwrite_builtin_install_marker\b/,
         message: 'missing core-owned built-in MiniApp marker write IO',
+      },
+      {
+        regex: /\bserialize_builtin_install_marker\b/,
+        message: 'missing product-domain built-in MiniApp marker serialization helper use',
       },
       {
         regex: /\brecompile\b/,
@@ -2289,12 +2305,47 @@ const requiredContentRules = [
         message: 'missing core-owned AI response JSON extraction',
       },
       {
+        regex: /\bparse_commit_analysis_json\b/,
+        message: 'missing product-domain Git function-agent JSON parser use',
+      },
+      {
         regex: /\bAgentError::analysis_error\b/,
         message: 'missing core-owned AI response error mapping',
       },
       {
         regex: /\bparse_commit_response_preserves_core_json_extraction_and_error_mapping\b/,
         message: 'missing Git function-agent AI response boundary regression test',
+      },
+    ],
+  },
+  {
+    path: 'src/crates/core/src/function_agents/startchat-func-agent/ai_service.rs',
+    reason:
+      'core must continue owning Startchat prompt template, AI call, JSON extraction, and error mapping until AI runtime migration is reviewed',
+    patterns: [
+      {
+        regex: /\bconst WORK_STATE_ANALYSIS_PROMPT\b/,
+        message: 'missing core-owned Startchat prompt template',
+      },
+      {
+        regex: /\bai_client\s*\.\s*send_message\b/,
+        message: 'missing core-owned Startchat AI call',
+      },
+      {
+        regex: /\bextract_json_from_ai_response\b/,
+        message: 'missing core-owned Startchat JSON extraction',
+      },
+      {
+        regex: /\bparse_complete_analysis_json\b/,
+        message: 'missing product-domain Startchat JSON parser use',
+      },
+      {
+        regex: /\bAgentError::internal_error\b/,
+        message: 'missing core-owned Startchat error mapping',
+      },
+      {
+        regex: /\bparse_complete_analysis_preserves_core_json_extraction_and_error_mapping\b/,
+        message: 'missing Startchat AI response boundary regression test',
       },
     ],
   },
@@ -2341,6 +2392,34 @@ const requiredContentRules = [
       {
         regex: /\bpub fn should_seed_builtin_app\b/,
         message: 'missing built-in MiniApp seed decision helper',
+      },
+      {
+        regex: /\bpub struct BuiltinSeedArtifacts\b/,
+        message: 'missing built-in MiniApp seed artifacts contract',
+      },
+      {
+        regex: /\bpub enum BuiltinSeedCheck\b/,
+        message: 'missing built-in MiniApp seed check contract',
+      },
+      {
+        regex: /\bpub enum BuiltinSeedAction\b/,
+        message: 'missing built-in MiniApp seed action contract',
+      },
+      {
+        regex: /\bpub fn resolve_builtin_seed_check\b/,
+        message: 'missing built-in MiniApp seed check helper',
+      },
+      {
+        regex: /\bpub fn resolve_builtin_seed_action\b/,
+        message: 'missing built-in MiniApp seed action helper',
+      },
+      {
+        regex: /\bpub fn serialize_builtin_install_marker\b/,
+        message: 'missing built-in MiniApp marker serialization helper',
+      },
+      {
+        regex: /\bpub fn parse_builtin_install_marker\b/,
+        message: 'missing built-in MiniApp marker parse helper',
       },
       {
         regex: /\bpub fn builtin_source_files\b/,
@@ -2419,6 +2498,10 @@ const requiredContentRules = [
         regex: /\bpub fn parse_complete_analysis_value\b/,
         message: 'missing Startchat complete-analysis value parser',
       },
+      {
+        regex: /\bpub fn parse_complete_analysis_json\b/,
+        message: 'missing Startchat complete-analysis JSON parser',
+      },
     ],
   },
   {
@@ -2429,6 +2512,10 @@ const requiredContentRules = [
       {
         regex: /\bpub fn parse_commit_analysis_value\b/,
         message: 'missing Git function-agent commit analysis value parser',
+      },
+      {
+        regex: /\bpub fn parse_commit_analysis_json\b/,
+        message: 'missing Git function-agent commit analysis JSON parser',
       },
       {
         regex: /\bpub fn truncate_diff_for_commit_prompt\b/,
@@ -3177,10 +3264,14 @@ function runManifestParserSelfTest() {
         'BUILTIN_APPS',
         'builtin_content_hash',
         'should_seed_builtin_app',
+        'resolve_builtin_seed_check',
+        'resolve_builtin_seed_action',
         'builtin_source_files',
         'BUILTIN_PLACEHOLDER_COMPILED_HTML',
         'read_builtin_install_marker',
+        'parse_builtin_install_marker',
         'write_builtin_install_marker',
+        'serialize_builtin_install_marker',
         'recompile',
         'load_customization_metadata',
         'available_builtin_update',
@@ -3194,6 +3285,13 @@ function runManifestParserSelfTest() {
         'BUILTIN_INSTALL_MARKER',
         'builtin_content_hash',
         'should_seed_builtin_app',
+        'BuiltinSeedArtifacts',
+        'BuiltinSeedCheck',
+        'BuiltinSeedAction',
+        'resolve_builtin_seed_check',
+        'resolve_builtin_seed_action',
+        'serialize_builtin_install_marker',
+        'parse_builtin_install_marker',
         'builtin_source_files',
         'BUILTIN_PLACEHOLDER_COMPILED_HTML',
         'build_builtin_package_json',
@@ -3323,8 +3421,20 @@ function runManifestParserSelfTest() {
         'prepare_commit_prompt',
         'send_message',
         'extract_json_from_ai_response',
+        'parse_commit_analysis_json',
         'AgentError::analysis_error',
         'parse_commit_response_preserves_core_json_extraction_and_error_mapping',
+      ],
+    },
+    {
+      path: 'src/crates/core/src/function_agents/startchat-func-agent/ai_service.rs',
+      contracts: [
+        'WORK_STATE_ANALYSIS_PROMPT',
+        'send_message',
+        'extract_json_from_ai_response',
+        'parse_complete_analysis_json',
+        'AgentError::internal_error',
+        'parse_complete_analysis_preserves_core_json_extraction_and_error_mapping',
       ],
     },
     {
@@ -3348,11 +3458,16 @@ function runManifestParserSelfTest() {
     },
     {
       path: 'src/crates/product-domains/src/function_agents/startchat_func_agent/utils.rs',
-      contracts: ['ParsedCompleteAnalysis', 'parse_complete_analysis_value'],
+      contracts: ['ParsedCompleteAnalysis', 'parse_complete_analysis_value', 'parse_complete_analysis_json'],
     },
     {
       path: 'src/crates/product-domains/src/function_agents/git_func_agent/utils.rs',
-      contracts: ['parse_commit_analysis_value', 'truncate_diff_for_commit_prompt', 'prepare_commit_prompt'],
+      contracts: [
+        'parse_commit_analysis_value',
+        'parse_commit_analysis_json',
+        'truncate_diff_for_commit_prompt',
+        'prepare_commit_prompt',
+      ],
     },
     {
       path: 'src/crates/core/src/miniapp/runtime_detect.rs',

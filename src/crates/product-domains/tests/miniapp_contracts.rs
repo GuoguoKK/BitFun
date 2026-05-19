@@ -2,9 +2,12 @@
 
 use bitfun_product_domains::miniapp::bridge_builder::{build_bridge_script, build_csp_content};
 use bitfun_product_domains::miniapp::builtin::{
-    build_builtin_package_json, builtin_content_hash, builtin_source_files,
-    should_seed_builtin_app, BuiltinInstallMarker, BuiltinMiniAppBundle, BUILTIN_INSTALL_MARKER,
-    BUILTIN_PLACEHOLDER_COMPILED_HTML, LEGACY_BUILTIN_VERSION_MARKER,
+    build_builtin_install_marker, build_builtin_package_json, builtin_content_hash,
+    builtin_source_files, legacy_builtin_version_marker_content, parse_builtin_install_marker,
+    resolve_builtin_seed_action, resolve_builtin_seed_check, serialize_builtin_install_marker,
+    should_seed_builtin_app, BuiltinInstallMarker, BuiltinMiniAppBundle, BuiltinSeedAction,
+    BuiltinSeedCheck, BUILTIN_INSTALL_MARKER, BUILTIN_PLACEHOLDER_COMPILED_HTML,
+    LEGACY_BUILTIN_VERSION_MARKER,
 };
 use bitfun_product_domains::miniapp::compiler::compile;
 use bitfun_product_domains::miniapp::customization::{
@@ -782,6 +785,61 @@ fn miniapp_builtin_contract_preserves_seed_marker_and_hash_policy() {
         BUILTIN_PLACEHOLDER_COMPILED_HTML,
         "<!DOCTYPE html><html><body>Loading...</body></html>"
     );
+}
+
+#[test]
+fn miniapp_builtin_contract_owns_seed_plan_and_marker_wire_shape() {
+    let app = BuiltinMiniAppBundle {
+        id: "builtin-demo",
+        version: 7,
+        meta_json: r#"{"id":"builtin-demo"}"#,
+        html: "<!doctype html><html></html>",
+        css: "body { color: red; }",
+        ui_js: r#"console.log("ui");"#,
+        worker_js: r#"console.log("worker");"#,
+        esm_dependencies_json: "[]",
+    };
+    let artifacts = bitfun_product_domains::miniapp::builtin::build_builtin_seed_artifacts(&app);
+    let marker = build_builtin_install_marker(&app, &artifacts.content_hash);
+
+    assert_eq!(artifacts.marker, marker);
+    assert_eq!(artifacts.legacy_version, "7");
+    assert_eq!(legacy_builtin_version_marker_content(&app), "7");
+    assert_eq!(
+        resolve_builtin_seed_check(&app, Some(&marker)),
+        BuiltinSeedCheck::Skip
+    );
+
+    let stale_marker = BuiltinInstallMarker {
+        version: 7,
+        hash: "sha256:stale".to_string(),
+    };
+    assert_eq!(
+        resolve_builtin_seed_check(&app, Some(&stale_marker)),
+        BuiltinSeedCheck::NeedsSeed(artifacts.clone())
+    );
+    assert_eq!(
+        resolve_builtin_seed_check(&app, None),
+        BuiltinSeedCheck::NeedsSeed(artifacts.clone())
+    );
+    assert_eq!(
+        resolve_builtin_seed_action(artifacts.clone(), true),
+        BuiltinSeedAction::PreserveLocalOverride(artifacts.clone())
+    );
+    assert_eq!(
+        resolve_builtin_seed_action(artifacts.clone(), false),
+        BuiltinSeedAction::SeedBundle(artifacts.clone())
+    );
+
+    let serialized = serialize_builtin_install_marker(&marker).unwrap();
+    assert_eq!(
+        serialized,
+        format!(
+            "{{\n  \"version\": 7,\n  \"hash\": \"{}\"\n}}",
+            artifacts.content_hash
+        )
+    );
+    assert_eq!(parse_builtin_install_marker(&serialized).unwrap(), marker);
 }
 
 #[test]

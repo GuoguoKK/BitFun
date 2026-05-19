@@ -7,7 +7,9 @@ use crate::util::types::Message;
  *
  * Handles AI client interaction and provides intelligent analysis for commit message generation
  */
-use bitfun_product_domains::function_agents::git_func_agent::prepare_commit_prompt;
+use bitfun_product_domains::function_agents::git_func_agent::{
+    parse_commit_analysis_json, prepare_commit_prompt,
+};
 use log::{debug, error, warn};
 use std::sync::Arc;
 
@@ -99,11 +101,7 @@ impl AIAnalysisService {
         let json_str = crate::util::extract_json_from_ai_response(response)
             .ok_or_else(|| AgentError::analysis_error("Cannot extract JSON from response"))?;
 
-        let value: serde_json::Value = serde_json::from_str(&json_str).map_err(|e| {
-            AgentError::analysis_error(format!("Failed to parse AI response: {}", e))
-        })?;
-
-        super::utils::parse_commit_analysis_value(&value).map_err(AgentError::analysis_error)
+        parse_commit_analysis_json(&json_str).map_err(AgentError::analysis_error)
     }
 }
 

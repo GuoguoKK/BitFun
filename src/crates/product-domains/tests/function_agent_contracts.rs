@@ -3,10 +3,10 @@
 use bitfun_product_domains::function_agents::{
     git_func_agent::{
         assemble_commit_message, build_changes_summary_from_paths, build_commit_prompt,
-        detect_change_patterns, extract_module_name, infer_file_type, parse_commit_analysis_value,
-        parse_commit_type_label, prepare_commit_prompt, truncate_diff_for_commit_prompt,
-        ChangePattern, CommitFormat, CommitMessageOptions, CommitType, FileChange, FileChangeType,
-        ProjectContext,
+        detect_change_patterns, extract_module_name, infer_file_type, parse_commit_analysis_json,
+        parse_commit_analysis_value, parse_commit_type_label, prepare_commit_prompt,
+        truncate_diff_for_commit_prompt, ChangePattern, CommitFormat, CommitMessageOptions,
+        CommitType, FileChange, FileChangeType, ProjectContext,
     },
     ports::{
         CommitAiAnalysisRequest, FunctionAgentAiPort, FunctionAgentFuture, FunctionAgentGitPort,
@@ -15,9 +15,10 @@ use bitfun_product_domains::function_agents::{
     },
     startchat_func_agent::{
         build_complete_analysis_prompt, combine_git_diffs, limit_quick_actions,
-        normalize_predicted_actions, parse_complete_analysis_value, parse_git_status_porcelain,
-        parse_predicted_actions_from_values, parse_quick_actions_from_values, time_of_day_for_hour,
-        ActionPriority, AheadBehind, GitWorkState, QuickActionType, TimeOfDay, WorkStateOptions,
+        normalize_predicted_actions, parse_complete_analysis_json, parse_complete_analysis_value,
+        parse_git_status_porcelain, parse_predicted_actions_from_values,
+        parse_quick_actions_from_values, time_of_day_for_hour, ActionPriority, AheadBehind,
+        GitWorkState, QuickActionType, TimeOfDay, WorkStateOptions,
     },
     AgentErrorType, Language,
 };
@@ -644,4 +645,57 @@ fn git_function_agent_utils_preserve_change_classification() {
 
     assert!(patterns.contains(&ChangePattern::BugFix));
     assert!(patterns.contains(&ChangePattern::DocumentationUpdate));
+}
+
+#[test]
+fn function_agent_json_helpers_parse_ai_payloads_without_core_runtime() {
+    let commit = parse_commit_analysis_json(
+        r#"{
+            "type": "refactor",
+            "title": "refactor(product-domains): move parse helpers",
+            "body": "Keep runtime adapters in core.",
+            "confidence": 0.92
+        }"#,
+    )
+    .unwrap();
+    assert_eq!(commit.commit_type, CommitType::Refactor);
+    assert_eq!(
+        commit.title,
+        "refactor(product-domains): move parse helpers"
+    );
+    assert_eq!(
+        commit.body.as_deref(),
+        Some("Keep runtime adapters in core.")
+    );
+    assert_eq!(commit.confidence, 0.92);
+
+    let missing_title = parse_commit_analysis_json(r#"{"type":"fix"}"#).unwrap_err();
+    assert_eq!(missing_title, "Missing title field");
+
+    let invalid_commit = parse_commit_analysis_json("not json").unwrap_err();
+    assert!(invalid_commit.starts_with("Failed to parse AI response:"));
+
+    let work_state = parse_complete_analysis_json(
+        r#"{
+            "summary": "Working on product-domain owner closure.",
+            "predicted_actions": [
+                {"description": "Run checks", "priority": "High", "icon": "check", "is_reminder": false}
+            ],
+            "quick_actions": [
+                {"title": "Status", "command": "git status", "icon": "git", "action_type": "ViewStatus"}
+            ]
+        }"#,
+    )
+    .unwrap();
+    assert_eq!(
+        work_state.analysis.summary,
+        "Working on product-domain owner closure."
+    );
+    assert_eq!(work_state.predicted_actions_count, 1);
+    assert_eq!(work_state.quick_actions_count, 1);
+    assert_eq!(work_state.analysis.predicted_actions.len(), 3);
+    assert_eq!(work_state.analysis.quick_actions.len(), 1);
+
+    let invalid_work_state = parse_complete_analysis_json("not json").unwrap_err();
+    assert!(invalid_work_state.starts_with("Failed to parse complete analysis response:"));
 }

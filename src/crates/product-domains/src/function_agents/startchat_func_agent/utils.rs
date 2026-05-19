@@ -137,6 +137,7 @@ pub fn limit_quick_actions(mut actions: Vec<QuickAction>) -> Vec<QuickAction> {
     actions
 }
 
+#[derive(Debug, Clone)]
 pub struct ParsedCompleteAnalysis {
     pub analysis: AIGeneratedAnalysis,
     pub predicted_actions_count: usize,
@@ -173,6 +174,12 @@ pub fn parse_complete_analysis_value(parsed: &serde_json::Value) -> ParsedComple
         predicted_actions_count,
         quick_actions_count,
     }
+}
+
+pub fn parse_complete_analysis_json(json: &str) -> Result<ParsedCompleteAnalysis, String> {
+    let parsed = serde_json::from_str::<serde_json::Value>(json)
+        .map_err(|error| format!("Failed to parse complete analysis response: {}", error))?;
+    Ok(parse_complete_analysis_value(&parsed))
 }
 
 pub fn parse_action_priority_label(label: &str) -> ActionPriority {
