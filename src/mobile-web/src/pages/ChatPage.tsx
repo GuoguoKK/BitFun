@@ -2399,10 +2399,6 @@ const ChatPage: React.FC<ChatPageProps> = ({ sessionMgr, sessionId, sessionName,
       e.preventDefault();
       handleSend();
     }
-    if (e.key === 'Tab' && e.shiftKey) {
-      e.preventDefault();
-      cycleAgentMode();
-    }
   };
 
   const handleCancel = async () => {
@@ -2419,9 +2415,9 @@ const ChatPage: React.FC<ChatPageProps> = ({ sessionMgr, sessionId, sessionName,
   useEffect(() => {
     const onKeyDown = (e: KeyboardEvent) => {
       if (e.key === 'Tab' && e.shiftKey) {
-        // Skip when the textarea is focused — its own React handler already fired.
-        const tag = (e.target as HTMLElement)?.tagName;
-        if (tag === 'TEXTAREA') return;
+        const target = e.target as HTMLElement;
+        const tag = target?.tagName;
+        if (tag === 'INPUT' || tag === 'TEXTAREA' || tag === 'SELECT' || target?.isContentEditable) return;
         e.preventDefault();
         cycleAgentModeRef.current();
       }
