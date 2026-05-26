@@ -186,12 +186,20 @@ impl MCPConnection {
     ) -> MCPRuntimeResult<MCPResponse> {
         match &self.transport {
             TransportType::Local(transport) => {
-                let request_id = transport.send_request(method.clone(), params).await?;
-
+                let request_id = transport.next_request_id().await;
                 let (tx, rx) = oneshot::channel();
                 {
                     let mut pending = self.pending_requests.write().await;
                     pending.insert(request_id, tx);
+                }
+
+                if let Err(error) = transport
+                    .send_request_with_id(request_id, method.clone(), params)
+                    .await
+                {
+                    let mut pending = self.pending_requests.write().await;
+                    pending.remove(&request_id);
+                    return Err(error);
                 }
 
                 let response = if let Some(request_timeout) = self.request_timeout {
@@ -234,7 +242,15 @@ impl MCPConnection {
                 let response = self
                     .send_request_and_wait(request.method.clone(), request.params)
                     .await?;
-                parse_response_result(&response)
+                let result = parse_response_result(&response)?;
+
+                if let TransportType::Local(transport) = &self.transport {
+                    transport
+                        .send_notification("notifications/initialized".to_string(), None)
+                        .await?;
+                }
+
+                Ok(result)
             }
             TransportType::Remote(transport) => {
                 transport.initialize(client_name, client_version).await
