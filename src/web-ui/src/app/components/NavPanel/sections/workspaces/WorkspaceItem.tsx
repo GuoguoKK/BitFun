@@ -1,6 +1,6 @@
 import React, { useCallback, useContext, useEffect, useMemo, useRef, useState } from 'react';
 import { createPortal } from 'react-dom';
-import { Folder, FolderOpen, MoreHorizontal, FolderSearch, Plus, ChevronDown, Trash2, RotateCcw, Copy, FileText, GitBranch, Bot, Link2 } from 'lucide-react';
+import { Folder, FolderOpen, MoreHorizontal, FolderSearch, Plus, ChevronDown, Trash2, RotateCcw, Copy, FileText, GitBranch, Bot, Link2, Archive } from 'lucide-react';
 import { useTranslation } from 'react-i18next';
 import { DotMatrixArrowRightIcon } from './DotMatrixArrowRightIcon';
 import { Button, ConfirmDialog, Modal, Tooltip } from '@/component-library';
@@ -34,6 +34,8 @@ import { SSHContext } from '@/features/ssh-remote/SSHRemoteContext';
 import { useWorkspaceSearchIndex } from '@/tools/file-explorer';
 import { computeFixedPopoverPosition } from '@/shared/utils/fixedPopoverViewport';
 import WorkspaceRelatedPathsDialog from './WorkspaceRelatedPathsDialog';
+import { sessionAPI } from '@/infrastructure/api/service-api/SessionAPI';
+import { confirmWarning } from '@/component-library/components/ConfirmDialog/confirmService';
 
 
 interface WorkspaceItemProps {
@@ -371,6 +373,37 @@ const WorkspaceItem: React.FC<WorkspaceItemProps> = ({
       );
     }
   }, [closeWorkspaceById, t, workspace.id]);
+
+  const handleArchiveAllSessions = useCallback(async () => {
+    setMenuOpen(false);
+    const confirmed = await confirmWarning(
+      t('nav.sessions.archiveAllConfirmTitle'),
+      t('nav.sessions.archiveAllConfirmMessage')
+    );
+    if (!confirmed) return;
+    try {
+      const remoteWorkspace = isRemoteWorkspace(workspace);
+      await sessionAPI.archiveAllSessions(
+        workspace.rootPath,
+        remoteWorkspace ? workspace.connectionId : undefined,
+        remoteWorkspace ? workspace.sshHost : undefined
+      );
+      // Remove all workspace sessions from in-memory state (disk files preserved as archived)
+      flowChatManager.discardLocalSessionsForWorkspace({
+        id: workspace.id,
+        rootPath: workspace.rootPath,
+        connectionId: workspace.connectionId,
+        sshHost: workspace.sshHost,
+      });
+      window.dispatchEvent(new CustomEvent('bitfun:session-archived'));
+      notificationService.success(t('nav.sessions.archivedAll', { count: 0 }), { duration: 3000 });
+    } catch (error) {
+      notificationService.error(
+        error instanceof Error ? error.message : t('nav.sessions.archiveAllFailed'),
+        { duration: 4000 }
+      );
+    }
+  }, [workspace, t]);
 
   const handleRequestDeleteAssistant = useCallback(() => {
     setMenuOpen(false);
@@ -1119,6 +1152,14 @@ const WorkspaceItem: React.FC<WorkspaceItemProps> = ({
                   <span className="bitfun-nav-panel__workspace-item-menu-label">{t('nav.workspaces.actions.reveal')}</span>
                 </button>
                 <div className="bitfun-nav-panel__workspace-item-menu-divider" />
+                <button
+                  type="button"
+                  className="bitfun-nav-panel__workspace-item-menu-item"
+                  onClick={() => { void handleArchiveAllSessions(); }}
+                >
+                  <Archive size={13} />
+                  <span className="bitfun-nav-panel__workspace-item-menu-label">{t('nav.sessions.archiveAll')}</span>
+                </button>
                 <button type="button" className="bitfun-nav-panel__workspace-item-menu-item is-danger" onClick={() => { void handleCloseWorkspace(); }}>
                   <FolderOpen size={13} />
                   <span className="bitfun-nav-panel__workspace-item-menu-label">{t('nav.workspaces.actions.close')}</span>

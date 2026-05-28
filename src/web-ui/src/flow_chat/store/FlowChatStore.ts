@@ -1965,6 +1965,17 @@ export class FlowChatStore {
    * Initialize by loading persisted session metadata from disk
    * Clears sessions from other workspaces, then loads sessions for the target workspace.
    */
+  public async refreshWorkspaceFromDisk(
+    workspacePath: string,
+    remoteConnectionId?: string,
+    remoteSshHost?: string,
+    traceSource = 'refresh'
+  ): Promise<void> {
+    const requestKey = this.getMetadataListRequestKey(workspacePath, remoteConnectionId, remoteSshHost);
+    this.metadataListRequests.delete(requestKey);
+    await this.initializeFromDisk(workspacePath, remoteConnectionId, remoteSshHost, traceSource);
+  }
+
   public async initializeFromDisk(
     workspacePath: string,
     remoteConnectionId?: string,
@@ -2088,6 +2099,10 @@ export class FlowChatStore {
             return;
           }
           if (isLegacyPersistedBtwSession(metadata)) {
+            return;
+          }
+          // Skip archived sessions — they are managed in the settings page
+          if (metadata.status === 'archived') {
             return;
           }
 
