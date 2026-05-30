@@ -1872,8 +1872,9 @@ fn strip_markdown_fences(content: &str) -> String {
         return content.to_string();
     }
 
-    // Find the end of the opening fence line
-    let fence_end = trimmed.find('\n').unwrap_or(3);
+    let Some(fence_end) = trimmed.find('\n') else {
+        return String::new();
+    };
     // let _lang = &trimmed[3..fence_end].trim(); // language hint, ignored
 
     // Check if content ends with ```
@@ -2479,10 +2480,9 @@ mod tests {
     }
 
     #[test]
-    fn sanitization_strips_markdown_fences_without_tags() {
-        // Model ignored tag instructions but used markdown fences
-        let text = "```rust\nfn main() {}\n```";
-        assert_eq!(extract_bitfun_contents(text), "fn main() {}");
+    fn sanitization_handles_bare_markdown_fence_without_panic() {
+        let text = "```";
+        assert_eq!(extract_bitfun_contents(text), "");
     }
 
     #[test]
