@@ -23,7 +23,7 @@ import { useFlowChatSearch } from './useFlowChatSearch';
 import { useVirtualItems, useActiveSession, useVisibleTurnInfo, type VisibleTurnInfo } from '../../store/modernFlowChatStore';
 import type { FlowChatConfig, FlowToolItem, Session, DialogTurn } from '../../types/flow-chat';
 import type { LineRange } from '@/component-library';
-import { isChatPopupActive, subscribeChatPopupChange } from '../ChatInput';
+import { isChatPopupActive, subscribeChatPopupChange } from '../chatPopupState';
 import { useWorkspaceContext } from '@/infrastructure/contexts/WorkspaceContext';
 import { parsePullRequestUrl } from '@/shared/utils/pullRequestLinks';
 import { createReviewPlatformPullRequestDetailTab } from '@/shared/utils/tabUtils';

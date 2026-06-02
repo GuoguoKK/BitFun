@@ -68,27 +68,7 @@ import { deriveDeepReviewSessionConcurrencyGuard } from '../utils/deepReviewCapa
 import { agentAPI } from '@/infrastructure/api/service-api/AgentAPI';
 import './ChatInput.scss';
 
-// Module-level popup state – used by ModernFlowChatContainer to conditionally
-// disable the Escape shortcut so that slash-command and @-mention popups can be
-// closed with Escape.
-let _chatPopupActive = false;
-const _chatPopupListeners = new Set<() => void>();
-
-export function isChatPopupActive(): boolean {
-  return _chatPopupActive;
-}
-
-export function subscribeChatPopupChange(listener: () => void): () => void {
-  _chatPopupListeners.add(listener);
-  return () => { _chatPopupListeners.delete(listener); };
-}
-
-function setChatPopupActive(active: boolean) {
-  if (_chatPopupActive !== active) {
-    _chatPopupActive = active;
-    _chatPopupListeners.forEach(fn => fn());
-  }
-}
+import { setChatPopupActive } from './chatPopupState';
 
 const log = createLogger('ChatInput');
 
@@ -257,6 +237,7 @@ export const ChatInput: React.FC<ChatInputProps> = ({
   const inputValueRef = useRef('');
   const pendingLargePastesRef = useRef<PendingLargePasteMap>({});
   const largePasteCountersRef = useRef<Record<number, number>>({});
+  const undoImageStackRef = useRef<string[]>([]);
   
   // History navigation state
   const [historyIndex, setHistoryIndex] = useState(-1);
@@ -268,6 +249,9 @@ export const ChatInput: React.FC<ChatInputProps> = ({
   const addContext = useContextStore(state => state.addContext);
   const removeContext = useContextStore(state => state.removeContext);
   const clearContexts = useContextStore(state => state.clearContexts);
+
+  const contextsRef = useRef(contexts);
+  contextsRef.current = contexts;
 
   const imageContexts = useMemo(
     () => contexts.filter((c): c is ImageContext => c.type === 'image'),
@@ -345,9 +329,10 @@ export const ChatInput: React.FC<ChatInputProps> = ({
     const hasOnlyBr =
       el.childNodes.length === 1 &&
       (el.childNodes[0] as Element).nodeName === 'BR';
-    const isEmpty = (el.textContent ?? '').trim() === '' &&
+    const isDomEmpty = (el.textContent ?? '').trim() === '' &&
       (el.childNodes.length === 0 || hasOnlyBr);
-    setShowPlaceholder(isEmpty);
+    const hasContexts = contextsRef.current.length > 0;
+    setShowPlaceholder(isDomEmpty && !hasContexts);
   }, []);
 
   const measureCapsuleInputWidth = useCallback((): number | null => {
@@ -1314,6 +1299,7 @@ export const ChatInput: React.FC<ChatInputProps> = ({
         const imageContext = await createImageContextFromClipboard(file);
 
         addContext(imageContext);
+        undoImageStackRef.current.push(imageContext.id);
 
         if (!inputState.isActive) {
           dispatchInput({ type: 'ACTIVATE' });
@@ -2415,6 +2401,21 @@ export const ChatInput: React.FC<ChatInputProps> = ({
       return;
     }
 
+    // Ctrl+Z / Cmd+Z: undo last image paste (image pastes bypass the browser's native undo stack)
+    if ((e.ctrlKey || e.metaKey) && !e.shiftKey && !e.altKey && e.key.toLowerCase() === 'z') {
+      const stack = undoImageStackRef.current;
+      // Skip stale entries (images already removed manually or via clearContexts)
+      while (stack.length > 0) {
+        const imageId = stack.pop()!;
+        if (contextsRef.current.some(c => c.id === imageId)) {
+          e.preventDefault();
+          removeContext(imageId);
+          return;
+        }
+      }
+      // No valid image to undo; let the browser handle native text undo (do not preventDefault)
+    }
+
     const nativeEvt = e.nativeEvent as KeyboardEvent;
     // IME-owned keys must stay with the input method. In particular, Escape
     // closes the Chinese/Japanese/Korean candidate window and must not cancel
@@ -2657,7 +2658,7 @@ export const ChatInput: React.FC<ChatInputProps> = ({
       e.preventDefault();
       void handleCancelCurrentTask();
     }
-  }, [handleSendOrCancel, submitBtwFromInput, submitGoalFromInput, derivedState, handleCancelCurrentTask, slashCommandState, getFilteredIncrementalModes, getFilteredActions, getSlashPickerItems, selectSlashCommandMode, selectSlashCommandAction, selectSlashPromptCommand, canSwitchModes, historyIndex, inputHistory, savedDraft, inputState.value, currentSessionId, isBtwSession, showTargetSwitcher, setInputTarget, t]);
+  }, [handleSendOrCancel, submitBtwFromInput, submitGoalFromInput, derivedState, handleCancelCurrentTask, slashCommandState, getFilteredIncrementalModes, getFilteredActions, getSlashPickerItems, selectSlashCommandMode, selectSlashCommandAction, selectSlashPromptCommand, canSwitchModes, historyIndex, inputHistory, savedDraft, inputState.value, currentSessionId, isBtwSession, showTargetSwitcher, setInputTarget, removeContext, t]);
 
   const handleImeCompositionStart = useCallback(() => {
     isImeComposingRef.current = true;
