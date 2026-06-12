@@ -216,6 +216,67 @@ impl WorkspaceShell for LocalWorkspaceShell {
         command: &str,
         options: WorkspaceCommandOptions,
     ) -> anyhow::Result<WorkspaceCommandResult> {
+        // If a sandbox policy is provided, use the sandbox execution path.
+        if let Some(policy) = &options.sandbox_policy {
+            return self.exec_sandboxed(command, policy, &options).await;
+        }
+
+        // Default: unsandboxed execution (backward compatible).
+        self.exec_unsandboxed(command, &options).await
+    }
+}
+
+impl LocalWorkspaceShell {
+    /// Execute a command with sandbox policy.
+    async fn exec_sandboxed(
+        &self,
+        command: &str,
+        policy: &bitfun_sandbox::policy::SandboxPolicy,
+        options: &WorkspaceCommandOptions,
+    ) -> anyhow::Result<WorkspaceCommandResult> {
+        use bitfun_sandbox::manager::SandboxManager;
+
+        let manager = SandboxManager::new();
+        let timeout_ms = options.timeout_ms.unwrap_or(0);
+
+        // Build the command arguments for the sandbox.
+        // On Windows, use cmd /C; on Unix, use sh -c.
+        #[cfg(windows)]
+        let command_args: Vec<String> = vec![
+            "cmd".to_string(),
+            "/C".to_string(),
+            command.to_string(),
+        ];
+        #[cfg(not(windows))]
+        let command_args: Vec<String> = vec![
+            "sh".to_string(),
+            "-c".to_string(),
+            command.to_string(),
+        ];
+
+        let result = manager.execute(
+            policy.clone(),
+            &command_args,
+            Path::new(&self.workspace_root),
+            &[],
+            timeout_ms,
+        )?;
+
+        Ok(WorkspaceCommandResult {
+            stdout: String::from_utf8_lossy(&result.stdout).to_string(),
+            stderr: String::from_utf8_lossy(&result.stderr).to_string(),
+            exit_code: result.exit_code,
+            interrupted: false,
+            timed_out: result.timed_out,
+        })
+    }
+
+    /// Execute a command without sandboxing (original behavior).
+    async fn exec_unsandboxed(
+        &self,
+        command: &str,
+        options: &WorkspaceCommandOptions,
+    ) -> anyhow::Result<WorkspaceCommandResult> {
         use std::process::Stdio;
         use tokio::io::AsyncReadExt;
 

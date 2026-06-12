@@ -115,5 +115,17 @@
     "saveSuccess": "设置已保存",
     "saveFailed": "保存失败",
     "updateFailed": "设置失败"
+  },
+  "sandbox": {
+    "sectionTitle": "进程沙箱",
+    "sectionDescription": "控制命令执行的操作系统级沙箱。启用后，命令将在隔离进程中运行，文件系统和网络访问受限。",
+    "enable": "启用沙箱",
+    "enableDesc": "启用后，Shell 命令将在操作系统级沙箱中执行，限制文件和网络访问。",
+    "mode": "沙箱模式",
+    "modeDesc": "选择沙箱命令的限制级别。",
+    "modeWorkspaceWrite": "工作区可写",
+    "modeReadOnly": "只读",
+    "modeFullAccess": "完全访问",
+    "fullAccessWarning": "⚠️ 完全访问模式不提供文件系统保护。仅在可信环境中使用。"
   }
 }

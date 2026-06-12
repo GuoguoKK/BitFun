@@ -889,6 +889,47 @@ Usage notes:
                 .await;
         }
 
+        // ── Sandbox path guard ────────────────────────────────────────────
+        // Extract write target paths from the command and check them against
+        // the sandbox policy BEFORE execution. This catches redirects, tee,
+        // cp/mv, touch, mkdir, PowerShell commands, and interpreter inline code writes.
+        if let Some(workspace_root) = context.workspace_root() {
+            // Block dangerous commands that can bypass the sandbox (icacls, sudo, etc.)
+            if bitfun_sandbox::shell_parser::is_dangerous_command(command_str) {
+                if context.sandbox_policy().await.is_some() {
+                    return Err(BitFunError::tool(
+                        "Sandbox blocked: command contains a dangerous system operation \
+                         (ACL modification, privilege escalation, or elevation) that can bypass \
+                         the sandbox.\n  \
+                         To allow, disable the sandbox in settings.".to_string(),
+                    ));
+                }
+            }
+
+            let write_paths = bitfun_sandbox::shell_parser::extract_write_paths(
+                command_str,
+                workspace_root,
+            );
+            context.enforce_sandbox_path_policy("Bash", &write_paths).await?;
+
+            // If the command contains interpreter inline code (node -e, python -c, etc.)
+            // and we could not extract any write paths, block it by default — the sandbox
+            // cannot verify the safety of unverifiable inline code.
+            if bitfun_sandbox::shell_parser::has_interpreter_inline_code(command_str)
+                && write_paths.is_empty()
+            {
+                // Check if sandbox is enabled first
+                if context.sandbox_policy().await.is_some() {
+                    return Err(BitFunError::tool(
+                        "Sandbox blocked: command contains inline interpreter code that may perform \
+                         writes; sandbox cannot verify safety.\n  \
+                         To allow, disable the sandbox in settings, or rewrite the command to use \
+                         explicit file redirects (e.g. > file).".to_string(),
+                    ));
+                }
+            }
+        }
+
         // Remote workspace: execute via injected workspace shell
         if context.is_remote() {
             let Some(ws_shell) = context.ws_shell() else {
@@ -917,6 +958,7 @@ Usage notes:
                     WorkspaceCommandOptions {
                         timeout_ms: Some(timeout_ms),
                         cancellation_token: context.cancellation_token().cloned(),
+                        sandbox_policy: context.sandbox_policy().await,
                     },
                 )
                 .await

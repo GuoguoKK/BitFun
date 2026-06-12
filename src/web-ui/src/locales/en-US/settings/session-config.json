@@ -115,5 +115,17 @@
     "saveSuccess": "Settings saved",
     "saveFailed": "Save failed",
     "updateFailed": "Update failed"
+  },
+  "sandbox": {
+    "sectionTitle": "Process Sandbox",
+    "sectionDescription": "Control OS-level sandboxing for command execution. When enabled, commands run in an isolated process with restricted filesystem and network access.",
+    "enable": "Enable Sandbox",
+    "enableDesc": "When enabled, shell commands execute in an OS-level sandbox that restricts file and network access.",
+    "mode": "Sandbox Mode",
+    "modeDesc": "Choose the restriction level for sandboxed commands.",
+    "modeWorkspaceWrite": "Workspace Write",
+    "modeReadOnly": "Read Only",
+    "modeFullAccess": "Full Access",
+    "fullAccessWarning": "⚠️ Full Access mode provides no filesystem protection. Only use in trusted environments."
   }
 }

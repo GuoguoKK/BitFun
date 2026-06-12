@@ -16,6 +16,7 @@ members = [
     "src/crates/tool-packs",
     "src/crates/acp",
     "src/crates/core",
+    "src/crates/sandbox",
     "src/crates/terminal",
     "src/crates/tool-runtime",
     "src/crates/transport",
@@ -172,6 +173,9 @@ win32job = "2.0"
 # I18n internationalization
 fluent-bundle = "0.15"
 unic-langid = "0.9"
+
+# Sandbox
+bitfun-sandbox = { path = "src/crates/sandbox" }
 
 # Encryption (Remote Connect E2E)
 x25519-dalek = { version = "2.0", features = ["static_secrets"] }

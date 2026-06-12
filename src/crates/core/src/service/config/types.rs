@@ -6,6 +6,7 @@ use crate::util::errors::*;
 use async_trait::async_trait;
 use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
+use std::path::PathBuf;
 
 fn deserialize_agent_profiles<'de, D>(
     deserializer: D,
@@ -179,6 +180,17 @@ pub struct AIExperienceConfig {
     /// User-defined quick actions (post-coding menu); persisted for the web UI.
     #[serde(default)]
     pub quick_actions: Vec<AiExperienceQuickAction>,
+    /// Process-level sandbox mode for command execution.
+    /// Only affects the new bitfun-sandbox isolation layer — does NOT change
+    /// existing MiniApp iframe sandbox, ToolRuntimeRestrictions, or confirmation gates.
+    #[serde(default = "default_sandbox_mode")]
+    pub sandbox_mode: SandboxModeConfig,
+    /// Extra writable paths for sandbox (in addition to workspace root and temp dirs).
+    #[serde(default)]
+    pub sandbox_extra_writable_roots: Vec<PathBuf>,
+    /// Paths explicitly denied for writing in sandbox.
+    #[serde(default)]
+    pub sandbox_denied_write_paths: Vec<PathBuf>,
 }
 
 /// User-selected Agent companion pet package.
@@ -610,6 +622,20 @@ pub struct AIConfig {
     /// Maximum number of rounds per dialog turn before soft-pausing.
     #[serde(default = "default_max_rounds")]
     pub max_rounds: usize,
+
+    /// Process-level sandbox mode for command execution.
+    /// Only affects the new bitfun-sandbox isolation layer — does NOT change
+    /// existing MiniApp iframe sandbox, ToolRuntimeRestrictions, or confirmation gates.
+    #[serde(default = "default_sandbox_mode")]
+    pub sandbox_mode: SandboxModeConfig,
+
+    /// Extra writable paths for sandbox (in addition to workspace root and temp dirs).
+    #[serde(default)]
+    pub sandbox_extra_writable_roots: Vec<PathBuf>,
+
+    /// Paths explicitly denied for writing in sandbox.
+    #[serde(default)]
+    pub sandbox_denied_write_paths: Vec<PathBuf>,
 }
 
 impl AIConfig {
@@ -761,6 +787,31 @@ pub const DEFAULT_MAX_ROUNDS: usize = 200;
 
 fn default_max_rounds() -> usize {
     DEFAULT_MAX_ROUNDS
+}
+
+/// Process-level sandbox mode for command execution.
+/// Only affects the new bitfun-sandbox isolation layer.
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
+#[serde(rename_all = "kebab-case")]
+pub enum SandboxModeConfig {
+    /// Sandbox disabled — no process-level isolation (backward compatible default).
+    Disabled,
+    /// Only allow writes to project directory and temp directories.
+    WorkspaceWrite,
+    /// No writes allowed at all (read-only access).
+    ReadOnly,
+    /// Full access — no restrictions.
+    FullAccess,
+}
+
+impl Default for SandboxModeConfig {
+    fn default() -> Self {
+        SandboxModeConfig::Disabled
+    }
+}
+
+fn default_sandbox_mode() -> SandboxModeConfig {
+    SandboxModeConfig::Disabled
 }
 
 impl Default for AgentProfileConfig {
@@ -1362,6 +1413,9 @@ impl Default for AIExperienceConfig {
             agent_companion_pet: default_agent_companion_pet(),
             enable_workspace_search: false,
             quick_actions: Vec::new(),
+            sandbox_mode: default_sandbox_mode(),
+            sandbox_extra_writable_roots: Vec::new(),
+            sandbox_denied_write_paths: Vec::new(),
         }
     }
 }
@@ -1570,6 +1624,9 @@ impl Default for AIConfig {
             computer_use_enabled: false,
             browser_control_preferred_browser: String::new(),
             max_rounds: default_max_rounds(),
+            sandbox_mode: default_sandbox_mode(),
+            sandbox_extra_writable_roots: Vec::new(),
+            sandbox_denied_write_paths: Vec::new(),
         }
     }
 }

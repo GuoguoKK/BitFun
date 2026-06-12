@@ -147,6 +147,9 @@ bitfun-core-types = { path = "../core-types" }
 bitfun-events = { path = "../events" }
 bitfun-runtime-ports = { path = "../runtime-ports" }
 
+# Sandbox
+bitfun-sandbox = { path = "../sandbox" }
+
 # Transport layer dependency
 bitfun-transport = { path = "../transport" }
 

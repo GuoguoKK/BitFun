@@ -115,5 +115,17 @@
     "saveSuccess": "設置已儲存",
     "saveFailed": "儲存失敗",
     "updateFailed": "設置失敗"
+  },
+  "sandbox": {
+    "sectionTitle": "進程沙箱",
+    "sectionDescription": "控制命令執行的作業系統級沙箱。啟用後，命令將在隔離進程中執行，檔案系統和網路存取受限。",
+    "enable": "啟用沙箱",
+    "enableDesc": "啟用後，Shell 命令將在作業系統級沙箱中執行，限制檔案和網路存取。",
+    "mode": "沙箱模式",
+    "modeDesc": "選擇沙箱命令的限制級別。",
+    "modeWorkspaceWrite": "工作區可寫",
+    "modeReadOnly": "唯讀",
+    "modeFullAccess": "完全存取",
+    "fullAccessWarning": "⚠️ 完全存取模式不提供檔案系統保護。僅在可信環境中使用。"
   }
 }

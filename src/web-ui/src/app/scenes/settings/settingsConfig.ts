@@ -163,6 +163,13 @@ export const SETTINGS_CATEGORIES: ConfigCategoryDef[] = [
           'search',
           'flashgrep',
           'index',
+          'sandbox',
+          'sandboxing',
+          'isolation',
+          'restricted',
+          'acl',
+          'landlock',
+          'seatbelt',
         ],
       },
       {

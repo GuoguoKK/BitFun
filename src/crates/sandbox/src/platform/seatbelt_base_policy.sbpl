@@ -1,0 +1,89 @@
+(version 1)
+
+; Base policy inspired by Chrome's sandbox policy and Codex's Seatbelt policy.
+; Start with closed-by-default.
+(deny default)
+
+; Child processes inherit the policy of their parent
+(allow process-exec)
+(allow process-fork)
+(allow signal (target same-sandbox))
+
+; Process-info
+(allow process-info* (target same-sandbox))
+
+; Allow writing to /dev/null
+(allow file-write-data
+  (require-all
+    (path "/dev/null")
+    (vnode-type CHARACTER-DEVICE)))
+
+; Allowed sysctl reads
+(allow sysctl-read
+  (sysctl-name "hw.activecpu")
+  (sysctl-name "hw.byteorder")
+  (sysctl-name "hw.cacheconfig")
+  (sysctl-name "hw.cachelinesize_compat")
+  (sysctl-name "hw.cpufamily")
+  (sysctl-name "hw.cputype")
+  (sysctl-name "hw.logicalcpu_max")
+  (sysctl-name "hw.machine")
+  (sysctl-name "hw.memsize")
+  (sysctl-name "hw.ncpu")
+  (sysctl-name "hw.pagesize_compat")
+  (sysctl-name "hw.pagesize")
+  (sysctl-name "hw.physicalcpu")
+  (sysctl-name "hw.physicalcpu_max")
+  (sysctl-name "hw.logicalcpu")
+  (sysctl-name "kern.argmax")
+  (sysctl-name "kern.hostname")
+  (sysctl-name "kern.maxfilesperproc")
+  (sysctl-name "kern.maxproc")
+  (sysctl-name "kern.osproductversion")
+  (sysctl-name "kern.osrelease")
+  (sysctl-name "kern.ostype")
+  (sysctl-name "kern.osversion")
+  (sysctl-name "kern.version")
+  (sysctl-name "vm.loadavg")
+  (sysctl-name-prefix "kern.proc.pgrp.")
+  (sysctl-name-prefix "kern.proc.pid.")
+  (sysctl-name-prefix "net.routetable.")
+)
+
+; IOKit
+(allow iokit-open
+  (iokit-registry-entry-class "RootDomainUserClient"))
+
+; User info lookup
+(allow mach-lookup
+  (global-name "com.apple.system.opendirectoryd.libinfo"))
+
+; Python multiprocessing
+(allow ipc-posix-sem)
+
+; PyTorch/libomp
+(allow ipc-posix-shm-read-data
+  ipc-posix-shm-write-create
+  ipc-posix-shm-write-unlink
+  (ipc-posix-name-regex #"^/__KMP_REGISTERED_LIB_[0-9]+$"))
+
+; Power management
+(allow mach-lookup
+  (global-name "com.apple.PowerManagement.control"))
+
+; PTY support
+(allow pseudo-tty)
+(allow file-read* file-write* file-ioctl (literal "/dev/ptmx"))
+(allow file-read* file-write*
+  (require-all
+    (regex #"^/dev/ttys[0-9]+")
+    (extension "com.apple.sandbox.pty")))
+(allow file-ioctl (regex #"^/dev/ttys[0-9]+"))
+
+; User preferences (read-only)
+(allow ipc-posix-shm-read* (ipc-posix-name-prefix "apple.cfprefs."))
+(allow mach-lookup
+  (global-name "com.apple.cfprefsd.daemon")
+  (global-name "com.apple.cfprefsd.agent")
+  (local-name "com.apple.cfprefsd.agent"))
+(allow user-preference-read)

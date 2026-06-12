@@ -130,6 +130,9 @@ pub trait WorkspaceFileSystem: Send + Sync {
 pub struct WorkspaceCommandOptions {
     pub timeout_ms: Option<u64>,
     pub cancellation_token: Option<CancellationToken>,
+    /// Sandbox policy for the command execution.
+    /// When None, the command runs without sandboxing (backward compatible).
+    pub sandbox_policy: Option<bitfun_sandbox::policy::SandboxPolicy>,
 }
 
 impl std::fmt::Debug for WorkspaceCommandOptions {
@@ -142,6 +145,10 @@ impl std::fmt::Debug for WorkspaceCommandOptions {
                     .cancellation_token
                     .as_ref()
                     .map(|_| "<CancellationToken>"),
+            )
+            .field(
+                "sandbox_policy",
+                &self.sandbox_policy.as_ref().map(|p| &p.mode),
             )
             .finish()
     }

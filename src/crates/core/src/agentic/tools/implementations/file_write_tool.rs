@@ -17,7 +17,7 @@ use crate::agentic::tools::ToolPathOperation;
 use crate::util::errors::{BitFunError, BitFunResult};
 use async_trait::async_trait;
 use serde_json::{json, Value};
-use std::path::Path;
+use std::path::{Path, PathBuf};
 use tokio::fs;
 
 pub struct FileWriteTool;
@@ -566,6 +566,12 @@ impl Tool for FileWriteTool {
 
         let resolved = context.resolve_tool_path(file_path)?;
         context.enforce_path_operation(ToolPathOperation::Write, &resolved)?;
+
+        // Sandbox path guard: check write target against sandbox policy
+        context
+            .enforce_sandbox_path_policy("Write", &[PathBuf::from(&resolved.resolved_path)])
+            .await?;
+
         context
             .record_light_checkpoint(
                 "Write",

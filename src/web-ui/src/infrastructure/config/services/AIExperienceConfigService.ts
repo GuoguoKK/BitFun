@@ -27,7 +27,15 @@ export interface AIExperienceSettings {
   enable_workspace_search: boolean;
   /** User-defined quick actions shown in the post-coding actions menu. */
   quick_actions?: QuickAction[];
+  /** Process-level sandbox mode for command execution. Only affects the new bitfun-sandbox isolation layer. */
+  sandbox_mode: SandboxModeConfig;
+  /** Extra writable paths for sandbox (in addition to workspace root and temp dirs). */
+  sandbox_extra_writable_roots: string[];
+  /** Paths explicitly denied for writing in sandbox. */
+  sandbox_denied_write_paths: string[];
 }
+
+export type SandboxModeConfig = 'disabled' | 'workspace-write' | 'read-only' | 'full-access';
 
 export type AgentCompanionDisplayMode = 'input' | 'desktop';
 
@@ -66,6 +74,9 @@ const defaultSettings: AIExperienceSettings = {
   agent_companion_pet: DEFAULT_AGENT_COMPANION_PET,
   enable_workspace_search: false,
   quick_actions: DEFAULT_QUICK_ACTIONS,
+  sandbox_mode: 'disabled',
+  sandbox_extra_writable_roots: [],
+  sandbox_denied_write_paths: [],
 };
 
 function normalizeSettings(settings: AIExperienceSettings | null | undefined): AIExperienceSettings {

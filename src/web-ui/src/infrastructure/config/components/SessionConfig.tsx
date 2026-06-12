@@ -959,6 +959,61 @@ const SessionSettingsPanels: React.FC<SessionSettingsPanelsProps> = ({ variant }
         {variant === 'permissions' ? (
           <>
 
+        {/* ── Process-level Sandbox ─────────────────────────── */}
+        <ConfigPageSection
+          title={t('sandbox.sectionTitle')}
+          description={t('sandbox.sectionDescription')}
+        >
+          <ConfigPageRow label={t('sandbox.enable')} description={t('sandbox.enableDesc')} align="center">
+            <div className="bitfun-func-agent-config__row-control">
+              <Switch
+                checked={settings.sandbox_mode !== 'disabled'}
+                onChange={(e) => void updateSetting(
+                  'sandbox_mode',
+                  e.target.checked ? 'workspace-write' : 'disabled',
+                )}
+                size="small"
+              />
+            </div>
+          </ConfigPageRow>
+          {settings.sandbox_mode !== 'disabled' && (
+            <ConfigPageRow
+              label={t('sandbox.mode')}
+              description={t('sandbox.modeDesc')}
+              align="center"
+            >
+              <div className="bitfun-func-agent-config__row-control">
+                <Select
+                  size="small"
+                  options={[
+                    { value: 'workspace-write', label: t('sandbox.modeWorkspaceWrite') },
+                    { value: 'read-only', label: t('sandbox.modeReadOnly') },
+                    { value: 'full-access', label: t('sandbox.modeFullAccess') },
+                  ]}
+                  value={settings.sandbox_mode}
+                  onChange={(value) => {
+                    const mode = String(Array.isArray(value) ? value[0] : value) as
+                      | 'workspace-write' | 'read-only' | 'full-access';
+                    void updateSetting('sandbox_mode', mode);
+                  }}
+                />
+              </div>
+            </ConfigPageRow>
+          )}
+          {settings.sandbox_mode === 'full-access' && (
+            <div className="bitfun-func-agent-config__sandbox-warning" style={{
+              padding: '8px 12px',
+              borderRadius: 6,
+              background: 'var(--bitfun-color-warning-surface, #fef3cd)',
+              color: 'var(--bitfun-color-warning-text, #856404)',
+              fontSize: 13,
+              marginTop: 4,
+            }}>
+              {t('sandbox.fullAccessWarning')}
+            </div>
+          )}
+        </ConfigPageSection>
+
         {/* ── Accelerated workspace search ───────────────────────── */}
         <ConfigPageSection
           title={t('features.workspaceSearch.title')}

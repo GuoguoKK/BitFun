@@ -481,6 +481,47 @@ impl ToolUseContext {
         ))
     }
 
+    /// Enforce sandbox path policy for write operations.
+    ///
+    /// Checks each write target path against the sandbox policy configured
+    /// in AIConfig. Returns an error if any path is not allowed.
+    /// This is a pre-execution check that complements the OS-level sandbox
+    /// (Restricted Token + ACL) by catching disallowed writes before the
+    /// command even starts.
+    pub async fn enforce_sandbox_path_policy(
+        &self,
+        tool_name: &str,
+        write_paths: &[PathBuf],
+    ) -> BitFunResult<()> {
+        let policy = match self.sandbox_policy().await {
+            Some(p) => p,
+            None => return Ok(()), // Sandbox disabled
+        };
+
+        let workspace_root = match self.workspace_root() {
+            Some(root) => root,
+            None => return Ok(()),
+        };
+
+        for target in write_paths {
+            let result = bitfun_sandbox::guard::is_path_allowed(target, &policy, workspace_root);
+            if !result.allowed {
+                let reason = result.reason.unwrap_or_else(|| "unknown reason".to_string());
+                return Err(BitFunError::tool(format!(
+                    "Sandbox blocked: {} tool write to \"{}\"\n  \
+                     Reason: {}\n  \
+                     Allowed zones: project directory, temp directory\n  \
+                     To allow, add the path to sandbox.allow in settings, or disable the sandbox.",
+                    tool_name,
+                    target.display(),
+                    reason,
+                )));
+            }
+        }
+
+        Ok(())
+    }
+
     /// Resolve a user or model-supplied path for file/shell tools. Uses POSIX semantics when the
     /// workspace is remote SSH so Windows-hosted clients still resolve `/home/...` correctly.
     pub fn resolve_workspace_tool_path(&self, path: &str) -> BitFunResult<String> {
@@ -513,6 +554,90 @@ impl ToolUseContext {
         }
 
         Ok(resolved_path)
+    }
+
+    /// Build a sandbox policy for the current tool execution context.
+    ///
+    /// Reads the sandbox_mode from AIConfig (configured via UI settings).
+    /// Returns None when sandbox is disabled (default) or for remote workspaces.
+    /// Only affects the new bitfun-sandbox process-level isolation layer —
+    /// does NOT change existing MiniApp iframe sandbox, ToolRuntimeRestrictions,
+    /// or confirmation gates.
+    pub async fn sandbox_policy(&self) -> Option<bitfun_sandbox::policy::SandboxPolicy> {
+        // Remote workspaces don't use local sandboxing
+        if self.is_remote() {
+            return None;
+        }
+
+        let workspace_root = self.workspace_root()?;
+
+        // Read sandbox mode from AIExperienceConfig via the global config service.
+        // The sandbox_mode is stored in app.ai_experience (set by the UI settings page).
+        let ai_exp_config: crate::service::config::types::AIExperienceConfig =
+            match crate::service::config::global::get_global_config_service().await {
+                Ok(svc) => svc
+                    .get_config(Some("app.ai_experience"))
+                    .await
+                    .unwrap_or_default(),
+                Err(_) => crate::service::config::types::AIExperienceConfig::default(),
+            };
+
+        let sandbox_mode = ai_exp_config.sandbox_mode.clone();
+
+        match sandbox_mode {
+            crate::service::config::types::SandboxModeConfig::Disabled => None,
+            crate::service::config::types::SandboxModeConfig::WorkspaceWrite => {
+                let mut policy = bitfun_sandbox::policy::SandboxPolicy::new_workspace_write(
+                    workspace_root.to_path_buf(),
+                );
+
+                for root in &ai_exp_config.sandbox_extra_writable_roots {
+                    let path = PathBuf::from(root);
+                    if path.is_absolute()
+                        && !policy.writable_roots.contains(&path)
+                        && !policy.extra_writable_roots.contains(&path)
+                    {
+                        policy.extra_writable_roots.push(path);
+                    }
+                }
+                for denied in &ai_exp_config.sandbox_denied_write_paths {
+                    let path = PathBuf::from(denied);
+                    if path.is_absolute() && !policy.denied_write_paths.contains(&path) {
+                        policy.denied_write_paths.push(path);
+                    }
+                }
+
+                // Also incorporate ToolPathPolicy restrictions if present
+                let write_roots = &self.runtime_tool_restrictions.path_policy.write_roots;
+                for root in write_roots {
+                    let path = PathBuf::from(root);
+                    if path.is_absolute()
+                        && !policy.writable_roots.contains(&path)
+                        && !policy.extra_writable_roots.contains(&path)
+                    {
+                        policy.extra_writable_roots.push(path);
+                    }
+                }
+                let edit_roots = &self.runtime_tool_restrictions.path_policy.edit_roots;
+                for root in edit_roots {
+                    let path = PathBuf::from(root);
+                    if path.is_absolute()
+                        && !policy.writable_roots.contains(&path)
+                        && !policy.extra_writable_roots.contains(&path)
+                    {
+                        policy.extra_writable_roots.push(path);
+                    }
+                }
+
+                Some(policy)
+            }
+            crate::service::config::types::SandboxModeConfig::ReadOnly => {
+                Some(bitfun_sandbox::policy::SandboxPolicy::new_read_only())
+            }
+            crate::service::config::types::SandboxModeConfig::FullAccess => {
+                Some(bitfun_sandbox::policy::SandboxPolicy::new_full_access())
+            }
+        }
     }
 
     pub fn current_workspace_runtime_root(&self) -> BitFunResult<PathBuf> {

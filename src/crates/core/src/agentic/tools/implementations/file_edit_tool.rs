@@ -314,6 +314,12 @@ impl Tool for FileEditTool {
 
         let resolved = context.resolve_tool_path(file_path)?;
         context.enforce_path_operation(ToolPathOperation::Edit, &resolved)?;
+
+        // Sandbox path guard: check edit target against sandbox policy
+        context
+            .enforce_sandbox_path_policy("Edit", &[std::path::PathBuf::from(&resolved.resolved_path)])
+            .await?;
+
         context
             .record_light_checkpoint(
                 "Edit",
