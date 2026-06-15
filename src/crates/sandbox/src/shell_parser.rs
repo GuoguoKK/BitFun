@@ -647,6 +647,7 @@ mod tests {
             "node -e \"require('fs').writeFileSync('/tmp/test', 'hi')\"",
             Path::new("/workspace"),
         );
+        eprintln!("DEBUG js paths = {:?}", paths);
         assert!(paths.contains(&PathBuf::from("/tmp/test")));
     }
 

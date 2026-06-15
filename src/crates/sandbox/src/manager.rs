@@ -171,7 +171,7 @@ mod tests {
     fn execute_full_access_runs_unsandboxed() {
         let manager = SandboxManager::new();
         let policy = SandboxPolicy::new_full_access();
-        let command = vec![
+        let mut command = vec![
             if cfg!(windows) { "cmd".to_string() } else { "echo".to_string() },
             if cfg!(windows) { "/C".to_string() } else { "hello".to_string() },
         ];
