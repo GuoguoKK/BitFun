@@ -74,7 +74,7 @@ const defaultSettings: AIExperienceSettings = {
   agent_companion_pet: DEFAULT_AGENT_COMPANION_PET,
   enable_workspace_search: false,
   quick_actions: DEFAULT_QUICK_ACTIONS,
-  sandbox_mode: 'disabled',
+  sandbox_mode: 'workspace-write',
   sandbox_extra_writable_roots: [],
   sandbox_denied_write_paths: [],
 };

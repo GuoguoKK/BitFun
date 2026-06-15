@@ -806,12 +806,12 @@ pub enum SandboxModeConfig {
 
 impl Default for SandboxModeConfig {
     fn default() -> Self {
-        SandboxModeConfig::Disabled
+        SandboxModeConfig::WorkspaceWrite
     }
 }
 
 fn default_sandbox_mode() -> SandboxModeConfig {
-    SandboxModeConfig::Disabled
+    SandboxModeConfig::WorkspaceWrite
 }
 
 impl Default for AgentProfileConfig {

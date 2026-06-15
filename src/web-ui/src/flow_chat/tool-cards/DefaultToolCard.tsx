@@ -16,6 +16,9 @@ import {
   formatSessionViewPreviewText,
   isOnlySessionViewPreviewText,
 } from '../utils/sessionViewPreview';
+import { MarkdownRenderer } from '@/component-library';
+import { useSettingsStore } from '@/app/scenes/settings/settingsStore';
+import { useSceneStore } from '@/app/stores/sceneStore';
 import './DefaultToolCard.scss';
 
 const MAX_PREVIEW_CHARS = 4000;
@@ -148,6 +151,15 @@ export const DefaultToolCard: React.FC<ToolCardProps> = ({
       onExpand,
     });
   }, [applyExpandedState, canExpand, isExpanded, onExpand]);
+
+  const handleSettingsOpen = useCallback((tab: string) => {
+    try {
+      useSettingsStore.getState().setActiveTab(tab as any);
+      useSceneStore.getState().openScene('settings');
+    } catch {
+      // settings/scene store may be unavailable in some hosts; ignore
+    }
+  }, []);
 
   const getStatusText = () => {
     if (requiresConfirmation && !userConfirmed) {
@@ -290,7 +302,13 @@ export const DefaultToolCard: React.FC<ToolCardProps> = ({
               <div className="default-tool-card__section">
                 <div className="default-tool-card__section-label">{t('toolCards.common.executionResult')}</div>
                 {toolResult?.success === false ? (
-                  <div className="default-tool-card__error-message">{errorMessage}</div>
+                  typeof errorMessage === 'string' && errorMessage.includes('settings:') ? (
+                    <div className="default-tool-card__error-message">
+                      <MarkdownRenderer content={errorMessage} onSettingsOpen={handleSettingsOpen} />
+                    </div>
+                  ) : (
+                    <div className="default-tool-card__error-message">{errorMessage}</div>
+                  )
                 ) : (
                   <pre className="default-tool-card__code-block">{resultPreview}</pre>
                 )}

@@ -40,6 +40,9 @@ import { fileTabManager } from '../../shared/services/FileTabManager';
 import { CodePreview } from '../components/CodePreview';
 import { InlineDiffPreview } from '../components/InlineDiffPreview';
 import { Tooltip } from '@/component-library';
+import { MarkdownRenderer } from '@/component-library';
+import { useSettingsStore } from '@/app/scenes/settings/settingsStore';
+import { useSceneStore } from '@/app/stores/sceneStore';
 import { diffLines } from 'diff';
 import { createLogger } from '@/shared/utils/logger';
 import { CompactToolCard, CompactToolCardHeader } from './CompactToolCard';
@@ -906,15 +909,34 @@ export const FileOperationToolCard: React.FC<FileOperationToolCardProps> = ({
     </div>
   );
 
-  const renderErrorContent = () => (
-    <div className="error-content">
-      <div className="error-title">
-        <XCircle size={14} />
-        <span>{toolDisplayInfo.name}{t('toolCards.file.failed')}</span>
+  const handleSettingsOpen = useCallback((tab: string) => {
+    try {
+      useSettingsStore.getState().setActiveTab(tab as any);
+      useSceneStore.getState().openScene('settings');
+    } catch {
+      // settings/scene store may be unavailable in some hosts; ignore
+    }
+  }, []);
+
+  const renderErrorContent = () => {
+    const displayMessage = String(getDisplayMessage());
+    const hasSettingsLink = displayMessage.includes('settings:');
+    return (
+      <div className="error-content">
+        <div className="error-title">
+          <XCircle size={14} />
+          <span>{toolDisplayInfo.name}{t('toolCards.file.failed')}</span>
+        </div>
+        <div className="error-message">
+          {hasSettingsLink ? (
+            <MarkdownRenderer content={displayMessage} onSettingsOpen={handleSettingsOpen} />
+          ) : (
+            displayMessage
+          )}
+        </div>
       </div>
-      <div className="error-message">{getDisplayMessage()}</div>
-    </div>
-  );
+    );
+  };
 
   const isDeleteTool = toolItem.toolName === 'Delete';
 

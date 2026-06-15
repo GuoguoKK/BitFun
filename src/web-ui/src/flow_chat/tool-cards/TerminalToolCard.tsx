@@ -21,7 +21,7 @@ import { ToolCardStatusSlot } from './ToolCardStatusSlot';
 import { createTerminalTab } from '@/shared/utils/tabUtils';
 import { BaseToolCard, ToolCardHeader } from './BaseToolCard';
 import { CompactToolCard, CompactToolCardHeader } from './CompactToolCard';
-import { DotMatrixLoader, IconButton } from '../../component-library';
+import { DotMatrixLoader, IconButton, MarkdownRenderer } from '@/component-library';
 import { TerminalOutputRenderer } from '@/tools/terminal/components';
 import { createLogger } from '@/shared/utils/logger';
 import { useToolCardHeightContract, type ToolCardCollapseReason } from './useToolCardHeightContract';
@@ -32,6 +32,8 @@ import { ToolCommandPreview } from './ToolCommandPreview';
 import { hasAcpPermissionOptions } from './AcpPermissionActions.utils';
 import { AcpPermissionActions } from './AcpPermissionActions';
 import { formatSessionViewPreviewText } from '../utils/sessionViewPreview';
+import { useSettingsStore } from '@/app/scenes/settings/settingsStore';
+import { useSceneStore } from '@/app/stores/sceneStore';
 import './TerminalToolCard.scss';
 
 const log = createLogger('TerminalToolCard');
@@ -164,7 +166,16 @@ function renderTerminalExpandedContent(params: {
   );
 }
 
-function renderTerminalErrorContent(errorMessage: string): React.ReactNode {
+function renderTerminalErrorContent(errorMessage: string, onSettingsOpen?: (tab: string) => void): React.ReactNode {
+  // Sandbox denial messages contain a settings: link — render as markdown
+  // so the link becomes clickable.
+  if (errorMessage.includes('settings:')) {
+    return (
+      <div className="error-content">
+        <MarkdownRenderer content={errorMessage} onSettingsOpen={onSettingsOpen} />
+      </div>
+    );
+  }
   return (
     <div className="error-content">
       <div className="error-message">{errorMessage}</div>
@@ -637,8 +648,19 @@ export const TerminalToolCard: React.FC<TerminalToolCardProps> = ({
   const expandedContent = isExpanded
     ? renderTerminalExpandedContent({ viewState, liveOutput, parsedResult, waitingMessage, t })
     : null;
+  const handleSettingsOpen = useCallback((tab: string) => {
+    try {
+      useSettingsStore.getState().setActiveTab(tab as any);
+      useSceneStore.getState().openScene('settings');
+    } catch (error) {
+      log.warn('Failed to open settings', { error });
+    }
+  }, []);
   const errorContent = viewState.isFailed
-    ? renderTerminalErrorContent(toolResult?.error || t('toolCards.terminal.executionFailed'))
+    ? renderTerminalErrorContent(
+        toolResult?.error || t('toolCards.terminal.executionFailed'),
+        handleSettingsOpen,
+      )
     : null;
 
   return (

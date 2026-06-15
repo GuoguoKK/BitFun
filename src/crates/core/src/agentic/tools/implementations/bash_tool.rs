@@ -901,7 +901,8 @@ Usage notes:
                         "Sandbox blocked: command contains a dangerous system operation \
                          (ACL modification, privilege escalation, or elevation) that can bypass \
                          the sandbox.\n  \
-                         To allow, disable the sandbox in settings.".to_string(),
+                         To allow, disable the sandbox in \
+                         [Settings](settings:session-permissions).".to_string(),
                     ));
                 }
             }
@@ -923,7 +924,8 @@ Usage notes:
                     return Err(BitFunError::tool(
                         "Sandbox blocked: command contains inline interpreter code that may perform \
                          writes; sandbox cannot verify safety.\n  \
-                         To allow, disable the sandbox in settings, or rewrite the command to use \
+                         To allow, disable the sandbox in \
+                         [Settings](settings:session-permissions), or rewrite the command to use \
                          explicit file redirects (e.g. > file).".to_string(),
                     ));
                 }

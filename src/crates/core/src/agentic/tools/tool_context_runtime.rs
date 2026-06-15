@@ -511,7 +511,8 @@ impl ToolUseContext {
                     "Sandbox blocked: {} tool write to \"{}\"\n  \
                      Reason: {}\n  \
                      Allowed zones: project directory, temp directory\n  \
-                     To allow, add the path to sandbox.allow in settings, or disable the sandbox.",
+                     To adjust the sandbox policy, [open Settings](settings:session-permissions) \
+                     or disable the sandbox there.",
                     tool_name,
                     target.display(),
                     reason,

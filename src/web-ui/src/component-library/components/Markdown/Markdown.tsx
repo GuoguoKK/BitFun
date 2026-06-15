@@ -156,7 +156,7 @@ const sanitizeSchema = {
   },
   protocols: {
     ...defaultSchema.protocols,
-    href: [...(defaultSchema.protocols?.href || []), 'computer', 'file', 'tab', 'visualization'],
+    href: [...(defaultSchema.protocols?.href || []), 'computer', 'file', 'tab', 'visualization', 'settings'],
     src: [...(defaultSchema.protocols?.src || []), 'asset', 'data', 'http', 'https', 'tauri'],
   },
 };
@@ -637,12 +637,13 @@ export interface MarkdownProps {
   onOpenVisualization?: (visualization: any) => void;
   onFileViewRequest?: (filePath: string, fileName: string, lineRange?: LineRange) => void;
   onTabOpen?: (tabInfo: any) => void;
+  onSettingsOpen?: (tab: string) => void;
   onHttpLinkClick?: (url: string, event: React.MouseEvent<HTMLAnchorElement>) => boolean | void;
   onReproductionProceed?: () => void;
 }
 
-export const Markdown = React.memo<MarkdownProps>(({ 
-  content, 
+export const Markdown = React.memo<MarkdownProps>(({
+  content,
   basePath,
   className = '',
   isStreaming = false,
@@ -650,6 +651,7 @@ export const Markdown = React.memo<MarkdownProps>(({
   onOpenVisualization,
   onFileViewRequest,
   onTabOpen,
+  onSettingsOpen,
   onHttpLinkClick,
   onReproductionProceed
 }) => {
@@ -1002,11 +1004,12 @@ export const Markdown = React.memo<MarkdownProps>(({
       const isComputerLink = typeof hrefValue === 'string' && hrefValue.startsWith(COMPUTER_LINK_PREFIX);
       const isVisualizationLink = typeof hrefValue === 'string' && hrefValue.startsWith('visualization:');
       const isTabLink = typeof hrefValue === 'string' && hrefValue.startsWith('tab:');
+      const isSettingsLink = typeof hrefValue === 'string' && hrefValue.startsWith('settings:');
       const isHttpLink = typeof hrefValue === 'string' &&
         (hrefValue.startsWith('http://') || hrefValue.startsWith('https://'));
       const isMailtoLink = typeof hrefValue === 'string' && hrefValue.startsWith('mailto:');
 
-      if (typeof hrefValue === 'string' && !isVisualizationLink && !isTabLink && !isHttpLink && !isMailtoLink && !isHashLink) {
+      if (typeof hrefValue === 'string' && !isVisualizationLink && !isTabLink && !isSettingsLink && !isHttpLink && !isMailtoLink && !isHashLink) {
         let filePath = normalizeFileLikeHref(hrefValue);
 
         let lineRange: LineRange | undefined;
@@ -1131,7 +1134,31 @@ export const Markdown = React.memo<MarkdownProps>(({
           </button>
         );
       }
-      
+
+      if (isSettingsLink && typeof hrefValue === 'string') {
+        const settingsTab = hrefValue.replace('settings:', '');
+        return (
+          <button
+            className="tab-link settings-link"
+            onClick={(e) => {
+              e.preventDefault();
+              e.stopPropagation();
+              onSettingsOpen?.(settingsTab);
+            }}
+            type="button"
+            style={{
+              cursor: 'pointer',
+              textDecoration: 'underline',
+              background: 'none',
+              border: 'none',
+              font: 'inherit'
+            }}
+          >
+            {children}
+          </button>
+        );
+      }
+
       if (isHttpLink && typeof hrefValue === 'string') {
         return (
           <a 

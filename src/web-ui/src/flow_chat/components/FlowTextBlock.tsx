@@ -12,6 +12,8 @@ import { DotMatrixLoader } from '@/component-library';
 import type { FlowTextItem } from '../types/flow-chat';
 import { useFlowChatContext } from './modern/FlowChatContext';
 import { useTypewriter } from '../hooks/useTypewriter';
+import { useSettingsStore } from '@/app/scenes/settings/settingsStore';
+import { useSceneStore } from '@/app/stores/sceneStore';
 import './FlowTextBlock.scss';
 
 // Idle timeout (ms) after content stops growing.
@@ -52,6 +54,16 @@ export const FlowTextBlock = React.memo<FlowTextBlockProps>(({
   replayStreamingOnMount = true
 }) => {
   const { onFileViewRequest, onTabOpen, onHttpLinkClick, onOpenVisualization } = useFlowChatContext();
+
+  const handleSettingsOpen = React.useCallback((tab: string) => {
+    try {
+      useSettingsStore.getState().setActiveTab(tab as any);
+      useSceneStore.getState().openScene('settings');
+    } catch (error) {
+      // settings store may not be available in all hosts; fall back silently
+      console.warn('Failed to open settings', error);
+    }
+  }, []);
 
   // Normalize content to a string.
   const content = typeof textItem.content === 'string'
@@ -119,6 +131,7 @@ export const FlowTextBlock = React.memo<FlowTextBlockProps>(({
           isStreaming={isStreaming}
           onFileViewRequest={onFileViewRequest}
           onTabOpen={onTabOpen}
+          onSettingsOpen={handleSettingsOpen}
           onHttpLinkClick={onHttpLinkClick}
           onOpenVisualization={(visualization) => {
             onOpenVisualization?.(visualization?.type, visualization?.data);
